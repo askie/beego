@@ -43,6 +43,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	//"encoding/json"
 )
 
 // RFC5424 log message levels.
@@ -92,7 +93,7 @@ type Logger interface {
 }
 
 var adapters = make(map[string]newLoggerFunc)
-var levelPrefix = [LevelDebug + 1]string{"[M]", "[A]", "[C]", "[E]", "[W]", "[N]", "[I]", "[D]"}
+var levelPrefix = [LevelDebug + 1]string{"[M] ", "[A] ", "[C] ", "[E] ", "[W] ", "[N] ", "[I] ", "[D] "}
 
 // Register makes a log provide available by the provided name.
 // If Register is called twice with the same name or if driver is nil,
@@ -116,7 +117,6 @@ type BeeLogger struct {
 	enableFuncCallDepth bool
 	loggerFuncCallDepth int
 	asynchronous        bool
-	prefix              string
 	msgChanLen          int64
 	msgChan             chan *logMsg
 	signalChan          chan string
@@ -187,12 +187,12 @@ func (bl *BeeLogger) setLogger(adapterName string, configs ...string) error {
 		}
 	}
 
-	logAdapter, ok := adapters[adapterName]
+	log, ok := adapters[adapterName]
 	if !ok {
 		return fmt.Errorf("logs: unknown adaptername %q (forgotten Register?)", adapterName)
 	}
 
-	lg := logAdapter()
+	lg := log()
 	err := lg.Init(config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "logs.BeeLogger.SetLogger: "+err.Error())
@@ -233,7 +233,30 @@ func (bl *BeeLogger) DelLogger(adapterName string) error {
 	return nil
 }
 
+type NewLogMsg struct {
+	Time    string
+	Msg     interface{}
+	Level   string
+	Type    string
+	OrderId string
+	SubType string
+	SubId   string
+}
+
 func (bl *BeeLogger) writeToLoggers(when time.Time, msg string, level int) {
+	//logMsg := NewLogMsg{Time: time.Now().Format("2006-01-02 15:04:05"), Msg: msg}
+	//json.Marshal(logMsg)
+	//fmt.Fprint(os.Stdout, logMsg)
+	//logMMsg := make(map[string]interface{})
+	//logMMsg["time"] = time.Now().Format("2006-01-02 15:04:05")
+	//logMMsg["msg"] = msg
+	//logMMsg["level"] = ""
+	//logMMsg["type"] = ""
+	//logMMsg["order_id"] = ""
+	//logMMsg["subType"] = ""
+	//logMMsg["sub_id"] = ""
+	//data, _ := json.Marshal(logMMsg)
+	//fmt.Fprint(os.Stdout, string(data))
 	for _, l := range bl.outputs {
 		err := l.WriteMsg(when, msg, level)
 		if err != nil {
@@ -268,8 +291,8 @@ func (bl *BeeLogger) writeMsg(logLevel int, msg string, v ...interface{}) error 
 	if len(v) > 0 {
 		msg = fmt.Sprintf(msg, v...)
 	}
-
-	msg = bl.prefix + " " + msg
+	//@替换\n
+	msg = strings.Replace(msg, "\n", `\n`, -1)
 
 	when := time.Now()
 	if bl.enableFuncCallDepth {
@@ -287,7 +310,7 @@ func (bl *BeeLogger) writeMsg(logLevel int, msg string, v ...interface{}) error 
 		// set to emergency to ensure all log will be print out correctly
 		logLevel = LevelEmergency
 	} else {
-		msg = levelPrefix[logLevel] + " " + msg
+		msg = levelPrefix[logLevel] + msg
 	}
 
 	if bl.asynchronous {
@@ -295,11 +318,7 @@ func (bl *BeeLogger) writeMsg(logLevel int, msg string, v ...interface{}) error 
 		lm.level = logLevel
 		lm.msg = msg
 		lm.when = when
-		if bl.outputs != nil {
-			bl.msgChan <- lm
-		} else {
-			logMsgPool.Put(lm)
-		}
+		bl.msgChan <- lm
 	} else {
 		bl.writeToLoggers(when, msg, logLevel)
 	}
@@ -311,11 +330,6 @@ func (bl *BeeLogger) writeMsg(logLevel int, msg string, v ...interface{}) error 
 // log providers will not even be sent the message.
 func (bl *BeeLogger) SetLevel(l int) {
 	bl.level = l
-}
-
-// GetLevel Get Current log message level.
-func (bl *BeeLogger) GetLevel() int {
-	return bl.level
 }
 
 // SetLogFuncCallDepth set log funcCallDepth
@@ -331,11 +345,6 @@ func (bl *BeeLogger) GetLogFuncCallDepth() int {
 // EnableFuncCallDepth enable log funcCallDepth
 func (bl *BeeLogger) EnableFuncCallDepth(b bool) {
 	bl.enableFuncCallDepth = b
-}
-
-// set prefix
-func (bl *BeeLogger) SetPrefix(s string) {
-	bl.prefix = s
 }
 
 // start logger chan reading.
@@ -560,11 +569,6 @@ func Async(msgLen ...int64) *BeeLogger {
 // SetLevel sets the global log level used by the simple logger.
 func SetLevel(l int) {
 	beeLogger.SetLevel(l)
-}
-
-// SetPrefix sets the prefix
-func SetPrefix(s string) {
-	beeLogger.SetPrefix(s)
 }
 
 // EnableFuncCallDepth enable log funcCallDepth
