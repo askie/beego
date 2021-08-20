@@ -43,6 +43,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	//"encoding/json"
 )
 
 // RFC5424 log message levels.
@@ -232,7 +233,30 @@ func (bl *BeeLogger) DelLogger(adapterName string) error {
 	return nil
 }
 
+type NewLogMsg struct {
+	Time    string
+	Msg     interface{}
+	Level   string
+	Type    string
+	OrderId string
+	SubType string
+	SubId   string
+}
+
 func (bl *BeeLogger) writeToLoggers(when time.Time, msg string, level int) {
+	//logMsg := NewLogMsg{Time: time.Now().Format("2006-01-02 15:04:05"), Msg: msg}
+	//json.Marshal(logMsg)
+	//fmt.Fprint(os.Stdout, logMsg)
+	//logMMsg := make(map[string]interface{})
+	//logMMsg["time"] = time.Now().Format("2006-01-02 15:04:05")
+	//logMMsg["msg"] = msg
+	//logMMsg["level"] = ""
+	//logMMsg["type"] = ""
+	//logMMsg["order_id"] = ""
+	//logMMsg["subType"] = ""
+	//logMMsg["sub_id"] = ""
+	//data, _ := json.Marshal(logMMsg)
+	//fmt.Fprint(os.Stdout, string(data))
 	for _, l := range bl.outputs {
 		err := l.WriteMsg(when, msg, level)
 		if err != nil {
@@ -267,6 +291,9 @@ func (bl *BeeLogger) writeMsg(logLevel int, msg string, v ...interface{}) error 
 	if len(v) > 0 {
 		msg = fmt.Sprintf(msg, v...)
 	}
+	//@替换\n
+	msg = strings.Replace(msg, "\n", `\n`, -1)
+
 	when := time.Now()
 	if bl.enableFuncCallDepth {
 		_, file, line, ok := runtime.Caller(bl.loggerFuncCallDepth)

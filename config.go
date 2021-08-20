@@ -16,17 +16,16 @@ package beego
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"reflect"
-	"runtime"
-	"strings"
-
 	"github.com/astaxie/beego/config"
 	"github.com/astaxie/beego/context"
 	"github.com/astaxie/beego/logs"
 	"github.com/astaxie/beego/session"
 	"github.com/astaxie/beego/utils"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"strings"
 )
 
 // Config is the main struct for BConfig
@@ -122,6 +121,8 @@ var (
 	appConfigPath string
 	// appConfigProvider is the provider for the config, default is ini
 	appConfigProvider = "ini"
+
+	PanicSignal = make(chan string, 1)
 )
 
 func init() {
@@ -170,8 +171,9 @@ func recoverPanic(ctx *context.Context) {
 				break
 			}
 			logs.Critical(fmt.Sprintf("%s:%d", file, line))
-			stack = stack + fmt.Sprintln(fmt.Sprintf("%s:%d", file, line))
+			stack = stack + fmt.Sprint(fmt.Sprintf("%s:%d+", file, line))
 		}
+		PanicSignal <- stack
 		if BConfig.RunMode == DEV && BConfig.EnableErrorsRender {
 			showErr(err, ctx, stack)
 		}
