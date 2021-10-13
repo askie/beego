@@ -715,7 +715,10 @@ func (d *dbBase) UpdateBatch(q dbQuerier, qs *querySet, mi *modelInfo, cond *Con
 		tables.parseRelated(qs.related, qs.relDepth)
 	}
 
-	where, args := tables.getCondSQL(cond, false, tz)
+	where, args,err:= tables.getCondSQL(cond, false, tz)
+	if err != nil {
+		return 0, err
+	}
 
 	values = append(values, args...)
 
@@ -810,7 +813,10 @@ func (d *dbBase) DeleteBatch(q dbQuerier, qs *querySet, mi *modelInfo, cond *Con
 
 	Q := d.ins.TableQuote()
 
-	where, args := tables.getCondSQL(cond, false, tz)
+	where, args ,err:= tables.getCondSQL(cond, false, tz)
+	if err != nil {
+		return 0, err
+	}
 	join := tables.getJoinSQL()
 
 	cols := fmt.Sprintf("T0.%s%s%s", Q, mi.fields.pk.column, Q)
@@ -949,9 +955,18 @@ func (d *dbBase) ReadBatch(q dbQuerier, qs *querySet, mi *modelInfo, cond *Condi
 	tables := newDbTables(mi, d.ins)
 	tables.parseRelated(qs.related, qs.relDepth)
 
-	where, args := tables.getCondSQL(cond, false, tz)
-	groupBy := tables.getGroupSQL(qs.groups)
-	orderBy := tables.getOrderSQL(qs.orders)
+	where, args,err := tables.getCondSQL(cond, false, tz)
+	if err != nil {
+		return 0, err
+	}
+	groupBy,err := tables.getGroupSQL(qs.groups)
+	if err != nil {
+		return 0, err
+	}
+	orderBy, err := tables.getOrderSQL(qs.orders)
+	if err != nil {
+		return 0, err
+	}
 	limit := tables.getLimitSQL(mi, offset, rlimit)
 	join := tables.getJoinSQL()
 
@@ -1090,9 +1105,18 @@ func (d *dbBase) Count(q dbQuerier, qs *querySet, mi *modelInfo, cond *Condition
 	tables := newDbTables(mi, d.ins)
 	tables.parseRelated(qs.related, qs.relDepth)
 
-	where, args := tables.getCondSQL(cond, false, tz)
-	groupBy := tables.getGroupSQL(qs.groups)
-	tables.getOrderSQL(qs.orders)
+	where, args,err := tables.getCondSQL(cond, false, tz)
+	if err != nil {
+		return 0, err
+	}
+	groupBy ,err:= tables.getGroupSQL(qs.groups)
+	if err != nil {
+		return 0, err
+	}
+	_,err = tables.getOrderSQL(qs.orders)
+	if err != nil {
+		return 0,err
+	}
 	join := tables.getJoinSQL()
 
 	Q := d.ins.TableQuote()
@@ -1598,7 +1622,7 @@ func (d *dbBase) ReadValues(q dbQuerier, qs *querySet, mi *modelInfo, cond *Cond
 		for _, ex := range exprs {
 			index, name, fi, suc := tables.parseExprs(mi, strings.Split(ex, ExprSep))
 			if !suc {
-				panic(fmt.Errorf("unknown field/column name `%s`", ex))
+				return 0, fmt.Errorf("unknown field/column name `%s`", ex)
 			}
 			cols = append(cols, fmt.Sprintf("%s.%s%s%s %s%s%s", index, Q, fi.column, Q, Q, name, Q))
 			infos = append(infos, fi)
@@ -1612,9 +1636,18 @@ func (d *dbBase) ReadValues(q dbQuerier, qs *querySet, mi *modelInfo, cond *Cond
 		}
 	}
 
-	where, args := tables.getCondSQL(cond, false, tz)
-	groupBy := tables.getGroupSQL(qs.groups)
-	orderBy := tables.getOrderSQL(qs.orders)
+	where, args,err := tables.getCondSQL(cond, false, tz)
+	if err != nil {
+		return 0, err
+	}
+	groupBy,err := tables.getGroupSQL(qs.groups)
+	if err != nil {
+		return 0, err
+	}
+	orderBy,err := tables.getOrderSQL(qs.orders)
+	if err != nil {
+		return 0,err
+	}
 	limit := tables.getLimitSQL(mi, qs.offset, qs.limit)
 	join := tables.getJoinSQL()
 

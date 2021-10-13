@@ -326,7 +326,7 @@ loopFor:
 }
 
 // generate condition sql.
-func (t *dbTables) getCondSQL(cond *Condition, sub bool, tz *time.Location) (where string, params []interface{}) {
+func (t *dbTables) getCondSQL(cond *Condition, sub bool, tz *time.Location) (where string, params []interface{}, err error) {
 	if cond == nil || cond.IsEmpty() {
 		return
 	}
@@ -347,7 +347,10 @@ func (t *dbTables) getCondSQL(cond *Condition, sub bool, tz *time.Location) (whe
 			where += "NOT "
 		}
 		if p.isCond {
-			w, ps := t.getCondSQL(p.cond, true, tz)
+			w, ps, err := t.getCondSQL(p.cond, true, tz)
+			if err != nil {
+				break
+			}
 			if w != "" {
 				w = fmt.Sprintf("( %s) ", w)
 			}
@@ -365,7 +368,8 @@ func (t *dbTables) getCondSQL(cond *Condition, sub bool, tz *time.Location) (whe
 
 			index, _, fi, suc := t.parseExprs(mi, exprs)
 			if !suc {
-				panic(fmt.Errorf("unknown field/column name `%s`", strings.Join(p.exprs, ExprSep)))
+				err = fmt.Errorf("unknown field/column name `%s`", strings.Join(p.exprs, ExprSep))
+				return
 			}
 
 			if operator == "" {
@@ -391,7 +395,7 @@ func (t *dbTables) getCondSQL(cond *Condition, sub bool, tz *time.Location) (whe
 }
 
 // generate group sql.
-func (t *dbTables) getGroupSQL(groups []string) (groupSQL string) {
+func (t *dbTables) getGroupSQL(groups []string) (groupSQL string, err error) {
 	if len(groups) == 0 {
 		return
 	}
@@ -404,7 +408,8 @@ func (t *dbTables) getGroupSQL(groups []string) (groupSQL string) {
 
 		index, _, fi, suc := t.parseExprs(t.mi, exprs)
 		if !suc {
-			panic(fmt.Errorf("unknown field/column name `%s`", strings.Join(exprs, ExprSep)))
+			err = fmt.Errorf("unknown field/column name `%s`", strings.Join(exprs, ExprSep))
+			return
 		}
 
 		groupSqls = append(groupSqls, fmt.Sprintf("%s.%s%s%s", index, Q, fi.column, Q))
@@ -415,9 +420,9 @@ func (t *dbTables) getGroupSQL(groups []string) (groupSQL string) {
 }
 
 // generate order sql.
-func (t *dbTables) getOrderSQL(orders []string) (orderSQL string) {
+func (t *dbTables) getOrderSQL(orders []string) (orderSQL string, err error) {
 	if len(orders) == 0 {
-		return
+		return "", nil
 	}
 
 	Q := t.base.TableQuote()
@@ -433,14 +438,14 @@ func (t *dbTables) getOrderSQL(orders []string) (orderSQL string) {
 
 		index, _, fi, suc := t.parseExprs(t.mi, exprs)
 		if !suc {
-			panic(fmt.Errorf("unknown field/column name `%s`", strings.Join(exprs, ExprSep)))
+			return "", fmt.Errorf("unknown field/column name `%s`", strings.Join(exprs, ExprSep))
 		}
 
 		orderSqls = append(orderSqls, fmt.Sprintf("%s.%s%s%s %s", index, Q, fi.column, Q, asc))
 	}
 
 	orderSQL = fmt.Sprintf("ORDER BY %s ", strings.Join(orderSqls, ", "))
-	return
+	return orderSQL, nil
 }
 
 // generate limit sql.
