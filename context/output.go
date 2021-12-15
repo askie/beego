@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -30,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // BeegoOutput does work for sending response header.
@@ -61,7 +61,8 @@ func (output *BeegoOutput) Header(key, val string) {
 // it sends out response body directly.
 func (output *BeegoOutput) Body(content []byte) error {
 	var encoding string
-	var buf = &bytes.Buffer{}
+	var bt = make([]byte, 0, len(content))
+	var buf = bytes.NewBuffer(bt)
 	if output.EnableGzip {
 		encoding = ParseEncoding(output.Context.Request)
 	}
@@ -69,7 +70,7 @@ func (output *BeegoOutput) Body(content []byte) error {
 		output.Header("Content-Encoding", n)
 		output.Header("Content-Length", strconv.Itoa(buf.Len()))
 	} else {
-		output.Header("Content-Length", strconv.Itoa(len(content)))
+		output.Header("Content-Length", strconv.Itoa(buf.Len()))
 	}
 	// Write status code if it has been set manually
 	// Set it to 0 afterwards to prevent "multiple response.WriteHeader calls"
@@ -79,7 +80,7 @@ func (output *BeegoOutput) Body(content []byte) error {
 	} else {
 		output.Context.ResponseWriter.Started = true
 	}
-	io.Copy(output.Context.ResponseWriter, buf)
+	output.Context.ResponseWriter.Write(buf.Bytes())
 	return nil
 }
 
@@ -197,9 +198,18 @@ func (output *BeegoOutput) JSON(data interface{}, hasIndent bool, coding bool) e
 		return err
 	}
 	if coding {
-		content = []byte(stringsToJSON(string(content)))
+		content = strtobyte(stringsToJSON(bytetostr(content)))
 	}
 	return output.Body(content)
+}
+
+func strtobyte(str string) []byte {
+	x := (*[2]uintptr)(unsafe.Pointer(&str))
+	h := [3]uintptr{x[0], x[1], x[1]}
+	return *(*[]byte)(unsafe.Pointer(&h))
+}
+func bytetostr(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
 
 // JSONP writes jsonp to response body.
